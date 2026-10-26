@@ -4,6 +4,7 @@ Ejecutar desde la raíz del proyecto:
     python model/train.py
 """
 import json
+import os
 import pathlib
 
 import numpy as np
@@ -16,29 +17,20 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 
-DATA_DIR = pathlib.Path('data/cars')
+DATASET_PATH = pathlib.Path(os.environ.get('DATASET_PATH', 'data/cars.csv'))
 MODEL_PATH = pathlib.Path('model/car-price-v1.joblib')
 
 CAT_FEATURES = ['brand', 'model', 'transmission', 'fuelType']
 NUM_FEATURES = ['year', 'mileage', 'engineSize']
 TARGET = 'price'
 
-# Archivos que en realidad pertenecen a una marca ya existente
-BRAND_ALIAS = {'cclass': 'mercedes', 'merc': 'mercedes',
-               'focus': 'ford', 'hyundi': 'hyundai', 'vw': 'volkswagen'}
-
-
 def load_data() -> pd.DataFrame:
-    frames = []
-    for path in sorted(DATA_DIR.glob('*.csv')):
-        if path.stem.startswith('unclean'):  # versiones sucias de cclass/focus
-            continue
-        df = pd.read_csv(path)
-        df['brand'] = BRAND_ALIAS.get(path.stem, path.stem)
-        frames.append(df[['brand', 'model', 'year', 'transmission',
-                          'mileage', 'fuelType', 'engineSize', 'price']])
-    df = pd.concat(frames, ignore_index=True)
+    df = pd.read_csv(DATASET_PATH)
+    missing = set(CAT_FEATURES + NUM_FEATURES + [TARGET]) - set(df.columns)
+    if missing:
+        raise ValueError(f'Al dataset le faltan columnas: {sorted(missing)}')
 
+    df['brand'] = df['brand'].str.strip().str.lower()
     df['model'] = df['model'].str.strip()
     df = df.drop_duplicates()
     # Limpieza de valores absurdos (p. ej. year=2060, engineSize=0)
@@ -64,6 +56,7 @@ def build_pipeline() -> Pipeline:
 
 if __name__ == '__main__':
     df = load_data()
+    print(f'Dataset: {DATASET_PATH}')
     print(f'Filas: {len(df)} | Marcas: {df.brand.nunique()} | Modelos: {df.model.nunique()}')
 
     X = df[CAT_FEATURES + NUM_FEATURES]
