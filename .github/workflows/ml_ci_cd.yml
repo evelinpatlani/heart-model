@@ -12,6 +12,9 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.12']
+    env:
+      TAG: ${{ github.event.client_payload.sha || github.sha }}
+      IMAGE: ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -36,9 +39,11 @@ jobs:
         head -3 data/cars.csv
         wc -l data/cars.csv
     - name: train model
+      env:
+        MODEL_TAG: ${{ env.TAG }}
       run: python model/train.py
     - name: docker build
-      run: docker build -t ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha || github.sha }} .
+      run: docker build -t "$IMAGE:$TAG" .
     - name: show images
       run: docker images
     - name: docker login
@@ -47,4 +52,14 @@ jobs:
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
     - name: docker push
-      run: docker push ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.event.client_payload.sha || github.sha }}
+      run: docker push "$IMAGE:$TAG"
+    - name: render deploy
+      if: github.event_name == 'repository_dispatch'
+      env:
+        HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      run: |
+        if [ -z "$HOOK" ]; then
+          echo "Sin RENDER_DEPLOY_HOOK_URL: se omite el despliegue en Render"
+          exit 0
+        fi
+        curl -fsS -G "$HOOK" --data-urlencode "imgURL=docker.io/$IMAGE:$TAG"

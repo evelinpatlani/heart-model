@@ -3,6 +3,7 @@
 Ejecutar desde la raíz del proyecto:
     python model/train.py
 """
+import datetime
 import json
 import os
 import pathlib
@@ -82,9 +83,17 @@ if __name__ == '__main__':
     }
 
     print('Saving model..')
-    dump({'pipeline': pipeline,
-          'options': options,
-          'metrics': {'mae': float(mae), 'r2': float(r2)}},
-         MODEL_PATH, compress=3)
-    (MODEL_PATH.parent / 'options.json').write_text(
-        json.dumps(options, indent=2), encoding='utf-8')
+    dump(
+        {
+            'pipeline': pipeline,
+            'options': options,
+            'metrics': {
+                'mae': float(mae),
+                'r2': float(r2),
+                'n_rows': int(len(df)),
+                'tag': os.environ.get('MODEL_TAG', 'local'),
+                'trained_at': datetime.datetime.now(datetime.timezone.utc)
+                .strftime('%Y-%m-%d %H:%M UTC'),
+            },
+        },
+    )
