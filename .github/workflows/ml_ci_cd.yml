@@ -1,9 +1,9 @@
 name: Modelops deploy
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   repository_dispatch:
     types: [ml_ci_cd]
 jobs:
@@ -20,3 +20,18 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: python version
       run: python --version
+    - name: pip install
+      run: pip install -r requirements.txt
+    - name: train model
+      run: python model/train.py
+    - name: docker build
+      run: docker build -t ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.sha }} .
+    - name: show images
+      run: docker images
+    - name: docker login
+      env:
+        DOCKER_USER: ${{ secrets.DOCKER_USER }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USER" --password-stdin
+    - name: docker push
+      run: docker push ${{ secrets.DOCKER_USER }}/${{ secrets.MODEL_NAME }}:${{ github.sha }}
